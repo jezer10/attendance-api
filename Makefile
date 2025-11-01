@@ -9,13 +9,10 @@ install: ## Install dependencies
 
 dev: ## Install development dependencies
 	pip install -r requirements.txt
-	pip install pytest pytest-asyncio pytest-cov black flake8 mypy
+	pip install pytest black flake8 mypy isort
 
 test: ## Run tests
-	pytest tests/ -v --cov=. --cov-report=html
-
-test-watch: ## Run tests in watch mode
-	pytest-watch tests/
+	pytest -v
 
 lint: ## Run linting
 	flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics

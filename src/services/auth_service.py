@@ -4,7 +4,7 @@ from typing import Optional
 from fastapi import HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from config import settings
+from src.core.config import settings
 
 security = HTTPBearer()
 

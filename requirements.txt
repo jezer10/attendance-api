@@ -1,0 +1,4 @@
+fastapi==0.110.1
+uvicorn[standard]==0.29.0
+pydantic-settings==2.2.1
+PyJWT==2.8.0
