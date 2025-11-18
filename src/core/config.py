@@ -17,6 +17,7 @@ class Settings(BaseSettings):
 
     supabase_url: str = "https://your-supabase-url.supabase.co"
     supabase_key: str = "your-supabase-anon-or-service-role-key"
+    supabase_service_key: str = "your-supabase-service-role-key"
 
     class Config:
         env_file = ".env"

@@ -1,36 +1,204 @@
 import pytest
+from datetime import time
+from dataclasses import dataclass, field
 
-from models import AttendanceRequest, AttendanceAction, LocationData, UserCredentials
-from services.attendance_service import AttendanceService
-from exceptions import ValidationError
+from src.models import (
+    AttendanceRequest,
+    AttendanceSchedule,
+    ScheduleWindow,
+    LocationData,
+    DayOfWeek,
+)
+from src.services.attendance_service import AttendanceService
+from src.exceptions import NotFoundError, PersistenceError, ValidationError
 
 
-service = AttendanceService()
+FAKE_USER = {"id": "user-123", "email": "user@example.com"}
+
+
+@dataclass
+class FakeRepository:
+    upsert_should_fail: bool = False
+    fetch_should_fail: bool = False
+    stored_request: AttendanceRequest | None = None
+    calls: list[dict] = field(default_factory=list)
+
+    def upsert_schedule(
+        self, *, user_id: str, recorded_by: str, request: AttendanceRequest
+    ) -> None:
+        if self.upsert_should_fail:
+            raise PersistenceError("forced failure")
+        self.stored_request = request
+        self.calls.append(
+            {
+                "user_id": user_id,
+                "recorded_by": recorded_by,
+                "request": request,
+            }
+        )
+
+    def fetch_schedule(self, *, user_id: str) -> AttendanceRequest | None:
+        if self.fetch_should_fail:
+            raise PersistenceError("fetch failure")
+        return self.stored_request
+
+
+def make_service(repo: FakeRepository | None = None) -> AttendanceService:
+    return AttendanceService(repository=repo or FakeRepository())
 
 
 def make_request(
-    user_id: int = 1,
-    password: str = "secret",
-    action: AttendanceAction = AttendanceAction.ENTRY,
+    *,
+    is_active: bool = True,
+    entry_enabled: bool = True,
+    exit_enabled: bool = True,
+    timezone: str = "UTC-05:00 America/Lima",
 ) -> AttendanceRequest:
+    schedule = AttendanceSchedule(
+        entry=ScheduleWindow(
+            enabled=entry_enabled,
+            local_time=time(8, 5),
+            utc_time=time(13, 5),
+            days=[DayOfWeek.MONDAY, DayOfWeek.TUESDAY],
+        ),
+        exit=ScheduleWindow(
+            enabled=exit_enabled,
+            local_time=time(17, 30),
+            utc_time=time(22, 30),
+            days=[DayOfWeek.MONDAY, DayOfWeek.TUESDAY],
+        ),
+    )
+    location = LocationData(
+        address="Av. Example 123",
+        latitude=-12.04318,
+        longitude=-77.02824,
+        radius_meters=150,
+    )
     return AttendanceRequest(
-        credentials=UserCredentials(user_id=user_id, password=password),
-        location=LocationData(latitude=0.0, longitude=0.0),
-        action=action,
+        is_active=is_active,
+        schedule=schedule,
+        location=location,
+        timezone=timezone,
     )
 
 
-def test_process_attendance_success():
-    response = service.process_attendance(make_request())
+def test_process_attendance_success_for_entry_and_exit():
+    repo = FakeRepository()
+    service = make_service(repo)
+
+    response = service.process_attendance(make_request(), current_user=FAKE_USER)
 
     assert response.success is True
-    assert response.message == "Entry marked successfully"
-    assert response.action == AttendanceAction.ENTRY
-    assert response.location.latitude == 0.0
+    assert response.message == "Entry and exit attendance recorded"
+    assert response.schedule.entry.enabled is True
+    assert response.schedule.exit.enabled is True
+    assert response.location.address == "Av. Example 123"
+    assert repo.calls[0]["user_id"] == FAKE_USER["id"]
 
 
-def test_process_attendance_requires_password():
-    request = make_request(password="   ")
+def test_process_attendance_single_window_message():
+    service = make_service()
+    request = make_request(exit_enabled=False)
+
+    response = service.process_attendance(request, current_user=FAKE_USER)
+
+    assert response.message == "Entry attendance recorded"
+    assert response.schedule.exit.enabled is False
+
+
+def test_process_attendance_requires_timezone():
+    service = make_service()
+    request = make_request(timezone="   ")
 
     with pytest.raises(ValidationError):
-        service.process_attendance(request)
+        service.process_attendance(request, current_user=FAKE_USER)
+
+
+def test_process_attendance_requires_enabled_window_days():
+    service = make_service()
+    schedule = AttendanceSchedule(
+        entry=ScheduleWindow(
+            enabled=True,
+            local_time=time(8, 0),
+            utc_time=time(13, 0),
+            days=[],
+        ),
+        exit=ScheduleWindow(
+            enabled=False,
+            local_time=time(17, 0),
+            utc_time=time(22, 0),
+            days=[],
+        ),
+    )
+    location = LocationData(
+        address="Av. Example 123",
+        latitude=-12.04318,
+        longitude=-77.02824,
+        radius_meters=150,
+    )
+    request = AttendanceRequest(
+        is_active=True,
+        schedule=schedule,
+        location=location,
+        timezone="UTC-05:00 America/Lima",
+    )
+
+    with pytest.raises(ValidationError):
+        service.process_attendance(request, current_user=FAKE_USER)
+
+
+def test_process_attendance_requires_enabled_window():
+    service = make_service()
+    request = make_request(entry_enabled=False, exit_enabled=False)
+
+    with pytest.raises(ValidationError):
+        service.process_attendance(request, current_user=FAKE_USER)
+
+
+def test_process_attendance_propagates_persistence_errors():
+    repo = FakeRepository(upsert_should_fail=True)
+    service = make_service(repo)
+
+    with pytest.raises(PersistenceError):
+        service.process_attendance(make_request(), current_user=FAKE_USER)
+
+
+def test_get_attendance_schedule_returns_latest_configuration():
+    repo = FakeRepository()
+    service = make_service(repo)
+    request = make_request()
+    service.process_attendance(request, current_user=FAKE_USER)
+
+    result = service.get_attendance_schedule(current_user=FAKE_USER)
+
+    assert result == request
+
+
+def test_get_attendance_schedule_not_found():
+    repo = FakeRepository()
+    service = make_service(repo)
+
+    with pytest.raises(NotFoundError):
+        service.get_attendance_schedule(current_user=FAKE_USER)
+
+
+def test_get_attendance_schedule_propagates_persistence_errors():
+    repo = FakeRepository(fetch_should_fail=True)
+    service = make_service(repo)
+
+    with pytest.raises(PersistenceError):
+        service.get_attendance_schedule(current_user=FAKE_USER)
+
+
+def test_process_attendance_requires_user_context():
+    service = make_service()
+
+    with pytest.raises(ValidationError):
+        service.process_attendance(make_request(), current_user=None)
+
+
+def test_get_attendance_schedule_requires_user_context():
+    service = make_service()
+
+    with pytest.raises(ValidationError):
+        service.get_attendance_schedule(current_user=None)

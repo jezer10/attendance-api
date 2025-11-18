@@ -1,32 +1,34 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `main.py` boots the FastAPI app, configures CORS, and mounts routers from `api/routes.py`.
-- Domain logic is intentionally thin: `services/attendance_service.py` returns deterministic responses, while `services/auth_service.py` handles JWT tokens.
-- Runtime configuration is centralized in `config.py`; adjust env vars via `.env` prefixed with `APP_`.
-- Tests reside under `tests/`, currently `test_attendance.py`; mirror this layout for new suites.
+- `main.py` boots FastAPI, configures CORS, and mounts the versioned router from `src/api`.
+- Place routes under `src/api/v1/` (e.g., `attendance.py`) and re-export them in `src/api/v1/__init__.py` so the app exposes a single versioned entrypoint.
+- Pull configuration from `src/core/config.py` via the `settings` object, which maps every `APP_` environment variable.
+- Keep business logic in `src/services/` modules (`attendance_service.py`, `auth_service.py`) and mirror the code tree inside `src/tests/` using `test_<feature>.py`.
 
 ## Build, Test & Development Commands
-- `make install` installs runtime dependencies from `requirements.txt`; use `make dev` to add pytest, black, flake8, and mypy.
-- `make run` starts Uvicorn on `http://localhost:8000`; `make docker-run` spins up the Docker Compose stack.
-- Quality gates: `make lint` (flake8) and `make format` (black + isort) keep style consistent; `make type-check` runs mypy.
-- Container workflows: `make docker-build` builds the API image, `make docker-shell` opens a shell inside `attendance-api` for interactive debugging.
+- `make install` installs dependencies from `requirements.txt`; rerun only after dependency updates.
+- `make run` starts Uvicorn on `http://localhost:8000` (override with `PORT=9000 make run`).
+- `make dev` runs the contributor workflow: pytest, Black, Flake8, and mypy.
+- `make docker-run` / `make docker-stop` control the Compose stack needed for Supabase-backed flows.
+- Run `make format`, `make lint`, and `make type-check` before pushing to catch style or typing regressions early.
 
 ## Coding Style & Naming Conventions
-- Target Python 3.11; auto-format with Black (line length 88) and isort’s Black profile, then confirm with flake8 (max line length 127).
-- Keep FastAPI routers feature-scoped and expose descriptive callables (e.g., `mark_attendance`); services should prefer short, explicit methods like `process_attendance`.
-- Apply type hints throughout to preserve FastAPI docs and editor support; prefer simple return payloads that map directly to `pydantic` models.
+- Target Python 3.11, four-space indentation, and Black’s 88-character line limit; use isort’s Black profile so imports stay stable.
+- Apply explicit type hints to FastAPI endpoints and services; it keeps OpenAPI docs and editor tooling accurate.
+- Name routers and services after the feature (`attendance_router`, `process_attendance`) and keep handlers stateless through dependency injection with `Depends`.
 
 ## Testing Guidelines
-- Author pytest modules as `tests/test_<feature>.py` with functions `test_<behavior>`; co-locate fixtures inside the test module or `conftest.py` when it appears.
-- `make test` runs `pytest -v`; extend assertions to cover both success and failure paths when adding features.
-- Add `pytest.mark.asyncio` only if you introduce async logic; default services are synchronous for clarity.
+- Pytest powers the suite; `make test` (alias for `pytest -v`) is the required pre-push check.
+- Follow pytest naming patterns: `src/tests/test_<feature>.py` files with `test_<behavior>` functions.
+- Prefer synchronous tests; mark async paths with `@pytest.mark.asyncio` only when awaiting coroutines, and share reusable fixtures through `src/tests/conftest.py`.
 
 ## Commit & Pull Request Guidelines
-- History shows short descriptive commits (e.g., `last commit`); keep messages concise, prefer imperative voice, and wrap lines at ~72 characters.
-- Ensure each commit passes `make format`, `make lint`, and `make test`; include a summary of user-facing effects.
-- Pull requests should link issues, outline testing performed, and attach API samples or screenshots for UI-visible changes; highlight configuration updates touching `.env` or `config.py`.
+- Write short, imperative commit messages such as `Add attendance router`, wrapping at roughly 72 characters.
+- Confirm `make format`, `make lint`, and `make test` locally, then mention those results plus any manual API checks in the PR description.
+- Reference linked issues, include screenshots or sample curl commands for user-facing changes, and call out config or migration impacts (`.env`, `config.py`, Supabase settings).
 
-## Environment & Security Tips
-- Copy `.env.example` via `make setup-env`, fill local secrets locally, and never commit `.env`.
-- Stop containers with `make docker-stop` when done and clear caches via `make clean` before packaging changes.
+## Security & Configuration Tips
+- Run `make setup-env` to copy `.env.example`, keep secrets out of version control, and document required variables in the example file.
+- Tighten `settings.BACKEND_CORS_ORIGINS` in `main.py` before staging or production deployments.
+- Use `make clean` to clear caches prior to packaging, and audit Docker images whenever dependencies change to limit the attack surface.

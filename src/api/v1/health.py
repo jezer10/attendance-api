@@ -1,7 +1,9 @@
 from fastapi import APIRouter
-from models import  HealthResponse
+from src.models import HealthResponse
 from datetime import datetime
+
 router = APIRouter()
+
 
 @router.get("", response_model=HealthResponse)
 async def health_check():

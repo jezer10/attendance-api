@@ -7,4 +7,5 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     """Get current authenticated user"""
+    print(credentials)
     return AuthService.get_current_user(credentials)
