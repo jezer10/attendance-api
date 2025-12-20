@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    env: str = "development"
     jwt_secret_key: str = "change-me"
     jwt_algorithm: str = "HS256"
     log_level: str = "INFO"
@@ -12,6 +13,13 @@ class Settings(BaseSettings):
     latitude: float = 0.0
     longitude: float = 0.0
     host: str = "0.0.0.0"
+    whatsapp_template_url: str = "http://localhost:3000/api/v1/send/whatsapp-template"
+    whatsapp_template_name: str = "ticket_order"
+    whatsapp_language_code: str = "en"
+    whatsapp_auth_login_url: str = "http://localhost:3000/api/v1/auth/login"
+    whatsapp_auth_refresh_url: str = "http://localhost:3000/api/v1/auth/refresh"
+    whatsapp_auth_username: str = "admin"
+    whatsapp_auth_password: str = "example"
 
     port: int = 8000
 

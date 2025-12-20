@@ -6,6 +6,7 @@ from src.api import router as api_router
 from src.core.config import settings
 import uvicorn
 import os
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -48,8 +49,9 @@ async def root():
     """Root endpoint"""
     return {"message": "Attendance Management API", "version": "1.0.0", "docs": "/docs"}
 
+
 if __name__ == "__main__":
-    print()
+    reload = settings.env == "development"
     host = settings.host  # valor por defecto si no existe
-    port = int(os.getenv("PORT", settings.port))     # uvicorn requiere entero
-    uvicorn.run("main:app", host=host, port=port, reload=True)
+    port = int(os.getenv("PORT", settings.port))  # uvicorn requiere entero
+    uvicorn.run("main:app", host=host, port=port, reload=reload)

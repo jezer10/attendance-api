@@ -1,8 +1,10 @@
-from typing import List, Optional
-from enum import Enum
 from datetime import datetime, time
+from enum import Enum
+from typing import List, Optional
 
-from pydantic import BaseModel, Field, PositiveFloat
+import re
+
+from pydantic import BaseModel, Field, PositiveFloat, ConfigDict, field_validator
 
 
 class DayOfWeek(Enum):
@@ -16,6 +18,8 @@ class DayOfWeek(Enum):
 
 
 class LocationData(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     address: str = Field(..., min_length=1, description="Street address or landmark")
     latitude: float = Field(
         ..., ge=-90, le=90, description="Latitude in decimal degrees"
@@ -26,20 +30,24 @@ class LocationData(BaseModel):
     radius_meters: PositiveFloat = Field(
         ...,
         description="Allowed radius in meters for attendance validation",
+        alias="radiusMeters",
     )
-
-    class Config:
-        allow_population_by_field_name = True
 
 
 class ScheduleWindow(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     enabled: bool
-    local_time: time = Field()
-    utc_time: time = Field()
+    local_time: time = Field(alias="localTime")
+    utc_time: time = Field(alias="utcTime")
     days: List[DayOfWeek]
 
-    class Config:
-        allow_population_by_field_name = True
+    @field_validator("days", mode="before")
+    @classmethod
+    def _remove_null_days(cls, value):
+        if isinstance(value, list):
+            return [day for day in value if day]
+        return value
 
 
 class AttendanceSchedule(BaseModel):
@@ -48,23 +56,61 @@ class AttendanceSchedule(BaseModel):
 
 
 class AttendanceRequest(BaseModel):
-    is_active: bool = Field()
+    model_config = ConfigDict(populate_by_name=True)
+
+    is_active: bool = Field(alias="isActive")
     schedule: AttendanceSchedule
     location: LocationData
+    phone_number: Optional[str] = Field(alias="phoneNumber", default=None)
+    random_window_minutes: int = Field(
+        0,
+        alias="randomWindowMinutes",
+        ge=0,
+        le=240,
+        description="Random window minutes around the scheduled time",
+    )
     timezone: str
 
-    class Config:
-        allow_population_by_field_name = True
+    @field_validator("phone_number")
+    @classmethod
+    def _validate_phone_number(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        trimmed = value.strip()
+        if not trimmed:
+            return None
+        if not re.fullmatch(r"\+[1-9]\d{1,14}", trimmed):
+            raise ValueError("Phone number must be in E.164 format")
+        return trimmed
 
 
 class AttendanceResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     success: bool
     message: str
-    is_active: bool
+    is_active: bool = Field(alias="isActive")
     timezone: str
     schedule: AttendanceSchedule
+    phone_number: Optional[str] = Field(alias="phoneNumber", default=None)
+    random_window_minutes: int = Field(alias="randomWindowMinutes")
     timestamp: datetime = Field(default_factory=datetime.now)
     location: Optional[LocationData] = None
+
+
+class AttendanceNotifyRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    event_id: str = Field(alias="eventId")
+
+
+class AttendanceNotifyResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    success: bool
+    event_id: str = Field(alias="eventId")
+    wa_id: str = Field(alias="waId")
+    detail: str
 
 
 class HealthResponse(BaseModel):

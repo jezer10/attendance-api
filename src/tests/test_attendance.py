@@ -52,6 +52,7 @@ def make_request(
     is_active: bool = True,
     entry_enabled: bool = True,
     exit_enabled: bool = True,
+    random_window_minutes: int = 0,
     timezone: str = "UTC-05:00 America/Lima",
 ) -> AttendanceRequest:
     schedule = AttendanceSchedule(
@@ -78,6 +79,7 @@ def make_request(
         is_active=is_active,
         schedule=schedule,
         location=location,
+        random_window_minutes=random_window_minutes,
         timezone=timezone,
     )
 
@@ -114,7 +116,7 @@ def test_process_attendance_requires_timezone():
         service.process_attendance(request, current_user=FAKE_USER)
 
 
-def test_process_attendance_requires_enabled_window_days():
+def test_process_attendance_allows_empty_days_for_enabled_window():
     service = make_service()
     schedule = AttendanceSchedule(
         entry=ScheduleWindow(
@@ -140,11 +142,13 @@ def test_process_attendance_requires_enabled_window_days():
         is_active=True,
         schedule=schedule,
         location=location,
+        random_window_minutes=0,
         timezone="UTC-05:00 America/Lima",
     )
 
-    with pytest.raises(ValidationError):
-        service.process_attendance(request, current_user=FAKE_USER)
+    response = service.process_attendance(request, current_user=FAKE_USER)
+
+    assert response.message == "Entry attendance recorded"
 
 
 def test_process_attendance_requires_enabled_window():

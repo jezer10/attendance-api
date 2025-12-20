@@ -12,3 +12,7 @@ class PersistenceError(AttendanceError):
 
 class NotFoundError(AttendanceError):
     """Raised when a resource cannot be found."""
+
+
+class NotificationError(AttendanceError):
+    """Raised when sending notifications fails."""

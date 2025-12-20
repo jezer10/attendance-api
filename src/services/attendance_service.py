@@ -1,9 +1,12 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone, tzinfo
 from typing import List, Optional
 
-from src.models import AttendanceRequest, AttendanceResponse, ScheduleWindow
+import pytz
+
+from src.models import AttendanceRequest, AttendanceResponse
 from src.exceptions import NotFoundError, PersistenceError, ValidationError
+from src.services.whatsapp_service import WhatsAppService
 from src.services.attendance_repository import AttendanceRepository
 
 logger = logging.getLogger(__name__)
@@ -14,6 +17,7 @@ class AttendanceService:
 
     def __init__(self, repository: Optional[AttendanceRepository] = None) -> None:
         self._repository = repository
+        self._whatsapp_service = WhatsAppService()
 
     def process_attendance(
         self, request: AttendanceRequest, *, current_user: Optional[dict] = None
@@ -35,6 +39,8 @@ class AttendanceService:
             timezone=request.timezone,
             location=request.location,
             schedule=request.schedule,
+            phone_number=request.phone_number,
+            random_window_minutes=request.random_window_minutes,
             timestamp=datetime.now(),
         )
 
@@ -53,16 +59,8 @@ class AttendanceService:
         if not request.timezone.strip():
             raise ValidationError("Timezone cannot be empty")
 
-        AttendanceService._validate_window(request.schedule.entry, "entry")
-        AttendanceService._validate_window(request.schedule.exit, "exit")
-
         if not any(w.enabled for w in (request.schedule.entry, request.schedule.exit)):
             raise ValidationError("At least one schedule window must be enabled")
-
-    @staticmethod
-    def _validate_window(window: ScheduleWindow, label: str) -> None:
-        if window.enabled and not window.days:
-            raise ValidationError(f"{label.capitalize()} schedule must include days")
 
     @staticmethod
     def _active_windows(request: AttendanceRequest) -> List[str]:
@@ -106,6 +104,77 @@ class AttendanceService:
             raise NotFoundError("Attendance schedule not found")
 
         return schedule
+
+    async def notify_attendance_event(
+        self, *, event_id: str, current_user: Optional[dict]
+    ) -> dict:
+        self._ensure_user_context(current_user)
+        user_id = current_user.get("id")
+
+        event = self._get_repository().fetch_event(event_id=event_id)
+        if event is None or event.get("user_id") != user_id:
+            raise NotFoundError("Attendance event not found")
+
+        schedule = self._get_repository().fetch_schedule(user_id=user_id)
+        if schedule is None:
+            raise NotFoundError("Attendance schedule not found")
+
+        if not schedule.is_active:
+            raise ValidationError("Attendance schedule is inactive")
+
+        if not schedule.phone_number:
+            raise ValidationError("Phone number is required to send notifications")
+
+        event_time = self._parse_event_time(event.get("scheduled_for"))
+        timezone_name = self._safe_timezone(event.get("timezone") or schedule.timezone)
+        local_time = event_time.astimezone(timezone_name)
+
+        response = await self._whatsapp_service.send_template(
+            wa_id=self._format_wa_id(schedule.phone_number),
+            employee_name=current_user.get("email", "Employee"),
+            checkin_date=local_time.strftime("%d/%m/%Y"),
+            checkin_time=local_time.strftime("%H:%M"),
+            location_address=schedule.location.address,
+            location_latitude=float(schedule.location.latitude),
+            location_longitude=float(schedule.location.longitude),
+        )
+
+        return {
+            "success": True,
+            "event_id": event_id,
+            "wa_id": self._format_wa_id(schedule.phone_number),
+            "detail": response,
+        }
+
+    @staticmethod
+    def _parse_event_time(value: Optional[object]) -> datetime:
+        if isinstance(value, datetime):
+            return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        if value is None:
+            return datetime.now(timezone.utc)
+        if isinstance(value, str):
+            normalized = value.replace("Z", "+00:00")
+            parsed = datetime.fromisoformat(normalized)
+            return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+        raise ValidationError("Invalid event timestamp")
+
+    @staticmethod
+    def _safe_timezone(value: str) -> tzinfo:
+        parts = value.split()
+        for part in reversed(parts):
+            if "/" in part:
+                try:
+                    return pytz.timezone(part)
+                except pytz.UnknownTimeZoneError:
+                    break
+        try:
+            return pytz.timezone(value)
+        except pytz.UnknownTimeZoneError:
+            return timezone.utc
+
+    @staticmethod
+    def _format_wa_id(phone_number: str) -> str:
+        return phone_number.lstrip("+")
 
     def _get_repository(self) -> AttendanceRepository:
         if self._repository is None:

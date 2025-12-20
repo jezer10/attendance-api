@@ -1,20 +1,28 @@
-from fastapi import APIRouter, Header, Request
+from urllib.error import HTTPError, URLError
+from urllib.request import Request as HTTPRequest, urlopen
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.security import (
+    HTTPAuthorizationCredentials,
+    HTTPBasic,
+    HTTPBasicCredentials,
+    HTTPBearer,
+)
+from pydantic import BaseModel, EmailStr
+from postgrest.exceptions import APIError
 from supabase import Client, create_client
+from supabase_auth.errors import AuthApiError
+from typing import Annotated
+
 from src.core.config import settings
 from src.services.auth_service import AuthService
-from supabase_auth.errors import AuthApiError
+
 
 router = APIRouter()
-from pydantic import BaseModel, EmailStr
 
-from postgrest.exceptions import APIError
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from typing import Annotated
-import secrets  # para comparar contraseñas de forma segura
 
 security = HTTPBasic()
-
+bearer_security = HTTPBearer(auto_error=False)
 
 supabase: Client = create_client(settings.supabase_url, settings.supabase_key)
 
@@ -25,7 +33,17 @@ class UserOut(BaseModel):
     full_name: str | None = None
 
 
-def get_current_user(Authorization: str = Header(None)) -> UserOut:
+def get_bearer_token(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_security),
+) -> str:
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise HTTPException(status_code=401, detail="Falta header Authorization")
+    if not credentials.credentials:
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
+    return credentials.credentials
+
+
+def get_current_user(token: str = Depends(get_bearer_token)) -> UserOut:
     """
     Esta función valida el token JWT enviado por el cliente.
     Espera un header:
@@ -34,13 +52,19 @@ def get_current_user(Authorization: str = Header(None)) -> UserOut:
     Devuelve datos del user si todo está ok.
     """
 
-    if Authorization is None or not Authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Falta header Authorization")
-
-    token = Authorization.split(" ")[1]
-
     # Supabase puede decodificar el token y darte el user
-    user_info = supabase.auth.get_user(token)
+    try:
+        user_info = supabase.auth.get_user(token)
+    except AuthApiError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token inválido o expirado",
+        ) from exc
+    except Exception as exc:  # pragma: no cover - defensive
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se pudo validar el token",
+        ) from exc
 
     if user_info.user is None:
         raise HTTPException(status_code=401, detail="Token inválido o expirado")
@@ -97,6 +121,50 @@ def login(credentials: Annotated[HTTPBasicCredentials, Depends(security)]):
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error interno del servidor")
+
+
+@router.post("/logout")
+def logout(
+    token: str = Depends(get_bearer_token),
+    current_user: UserOut = Depends(get_current_user),
+) -> dict[str, str]:
+    logout_url = f"{settings.supabase_url}/auth/v1/logout"
+    logout_request = HTTPRequest(
+        logout_url,
+        data=b"",
+        method="POST",
+        headers={
+            "apikey": settings.supabase_key,
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    try:
+        with urlopen(logout_request, timeout=settings.request_timeout):
+            pass
+    except HTTPError as exc:
+        if exc.code in (
+            status.HTTP_400_BAD_REQUEST,
+            status.HTTP_401_UNAUTHORIZED,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token inválido o expirado",
+            ) from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="No se pudo cerrar sesión en Supabase",
+        ) from exc
+    except URLError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Proveedor de autenticación no disponible",
+        ) from exc
+
+    return {
+        "user_id": current_user.id,
+        "detail": "Sesión cerrada correctamente",
+    }
 
 
 @router.get("/refresh")

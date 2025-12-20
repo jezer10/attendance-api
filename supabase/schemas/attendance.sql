@@ -19,6 +19,12 @@ begin
             'sunday'
         );
     end if;
+    if not exists (select 1 from pg_type where typname = 'attendance_event_type') then
+        create type attendance_event_type as enum (
+            'entry',
+            'exit'
+        );
+    end if;
 end
 $$;
 
@@ -30,6 +36,8 @@ create table if not exists public.attendance_records (
     -- Status & configuration
     is_active boolean not null,
     timezone text not null,
+    random_window_minutes integer not null default 0,
+    phone_number text,
 
     -- Entry schedule
     entry_enabled boolean not null,
@@ -53,17 +61,35 @@ create table if not exists public.attendance_records (
 
     constraint uniq_attendance_records_user unique (user_id),
     -- Constraints to keep data consistent with the API contract.
-    constraint chk_entry_days
-        check (entry_enabled = false or coalesce(array_length(entry_days, 1), 0) > 0),
-    constraint chk_exit_days
-        check (exit_enabled = false or coalesce(array_length(exit_days, 1), 0) > 0),
     constraint chk_latitude
         check (location_latitude between -90 and 90),
     constraint chk_longitude
         check (location_longitude between -180 and 180),
     constraint chk_radius
-        check (location_radius_meters > 0)
+        check (location_radius_meters > 0),
+    constraint chk_phone_number
+        check (phone_number is null or phone_number ~ '^\+[1-9][0-9]{1,14}$')
 );
+
+create table if not exists public.attendance_events (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid not null references auth.users (id) on delete cascade,
+    event_type attendance_event_type not null,
+    event_date date not null,
+    scheduled_for timestamptz not null,
+    marked_at timestamptz not null default now(),
+    timezone text not null,
+    base_local_time time not null,
+    random_window_minutes integer not null,
+    offset_minutes integer not null,
+    created_at timestamptz not null default now(),
+    constraint uniq_attendance_event unique (user_id, event_date, event_type),
+    constraint chk_random_window_minutes
+        check (random_window_minutes >= 0)
+);
+
+create index if not exists attendance_events_user_idx
+    on public.attendance_events (user_id, event_date desc);
 
 create index if not exists attendance_records_user_idx
     on public.attendance_records (user_id, recorded_at desc);

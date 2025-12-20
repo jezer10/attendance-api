@@ -113,6 +113,8 @@ class AttendanceRepository:
             "recorded_by": recorded_by,
             "is_active": request.is_active,
             "timezone": request.timezone,
+            "random_window_minutes": request.random_window_minutes,
+            "phone_number": request.phone_number,
             "entry_enabled": entry.enabled,
             "entry_local_time": _serialize_time(entry.local_time),
             "entry_utc_time": _serialize_time(entry.utc_time),
@@ -133,10 +135,6 @@ class AttendanceRepository:
             return dt_time.fromisoformat(value)
 
         entry_days = [DayOfWeek(day) for day in payload.get("entry_days", [])]
-
-        print(
-            payload["entry_local_time"],_parse_time(payload["entry_local_time"])
-        )
 
         entry_window = ScheduleWindow(
             enabled=payload.get("entry_enabled", False),
@@ -163,5 +161,26 @@ class AttendanceRepository:
             is_active=payload["is_active"],
             schedule=AttendanceSchedule(entry=entry_window, exit=exit_window),
             location=location,
+            phone_number=payload.get("phone_number"),
+            random_window_minutes=payload.get("random_window_minutes", 0),
             timezone=payload["timezone"],
         )
+
+    def fetch_event(self, *, event_id: str) -> Optional[Dict[str, Any]]:
+        try:
+            response = (
+                self._client.table("attendance_events")
+                .select("*")
+                .eq("id", event_id)
+                .limit(1)
+                .execute()
+            )
+        except (AuthApiError, APIError) as exc:
+            logger.warning("Supabase error fetching event %s: %s", event_id, exc)
+            raise PersistenceError("Unable to fetch attendance event") from exc
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.exception("Unexpected event fetch error for %s", event_id)
+            raise PersistenceError("Unable to fetch attendance event") from exc
+
+        data = response.data[0] if getattr(response, "data", None) else None
+        return data or None

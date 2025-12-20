@@ -8,5 +8,6 @@ services:
       - APP_JWT_ALGORITHM=HS256
       - APP_LOG_LEVEL=INFO
       - APP_PORT=8000
+      - APP_ENV=production
     ports:
       - "8000:8000"
