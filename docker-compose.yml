@@ -10,7 +10,9 @@ services:
       - APP_PORT=8000
       - APP_ENV=production
     ports:
-      - "8000:8000"
+      - "8000"
+    networks:
+      - general_bridge
 
 networks:
   general_bridge:
