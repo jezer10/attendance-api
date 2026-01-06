@@ -105,7 +105,9 @@ class AttendanceRepository:
         exit_window = request.schedule.exit
         location = request.location
 
-        def _serialize_time(value) -> str:
+        def _serialize_time(value: Optional[dt_time]) -> Optional[str]:
+            if value is None:
+                return None
             return value.strftime("%H:%M:%S")
 
         return {
@@ -131,22 +133,24 @@ class AttendanceRepository:
 
     @staticmethod
     def _parse_payload(payload: Dict[str, Any]) -> AttendanceRequest:
-        def _parse_time(value: str) -> dt_time:
+        def _parse_time(value: Optional[str]) -> Optional[dt_time]:
+            if not value:
+                return None
             return dt_time.fromisoformat(value)
 
         entry_days = [DayOfWeek(day) for day in payload.get("entry_days", [])]
 
         entry_window = ScheduleWindow(
             enabled=payload.get("entry_enabled", False),
-            local_time=_parse_time(payload["entry_local_time"]),
-            utc_time=_parse_time(payload["entry_utc_time"]),
+            local_time=_parse_time(payload.get("entry_local_time")),
+            utc_time=_parse_time(payload.get("entry_utc_time")),
             days=entry_days,
         )
 
         exit_window = ScheduleWindow(
             enabled=payload.get("exit_enabled", False),
-            local_time=_parse_time(payload["exit_local_time"]),
-            utc_time=_parse_time(payload["exit_utc_time"]),
+            local_time=_parse_time(payload.get("exit_local_time")),
+            utc_time=_parse_time(payload.get("exit_utc_time")),
             days=[DayOfWeek(day) for day in payload.get("exit_days", [])],
         )
 

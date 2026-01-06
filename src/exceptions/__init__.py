@@ -16,3 +16,7 @@ class NotFoundError(AttendanceError):
 
 class NotificationError(AttendanceError):
     """Raised when sending notifications fails."""
+
+
+class MarkingError(AttendanceError):
+    """Raised when attendance marking fails."""

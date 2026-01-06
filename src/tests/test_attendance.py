@@ -2,6 +2,8 @@ import pytest
 from datetime import time
 from dataclasses import dataclass, field
 
+from pydantic import ValidationError as PydanticValidationError
+
 from src.models import (
     AttendanceRequest,
     AttendanceSchedule,
@@ -151,12 +153,65 @@ def test_process_attendance_allows_empty_days_for_enabled_window():
     assert response.message == "Entry attendance recorded"
 
 
+def test_request_allows_null_times_for_disabled_windows():
+    schedule = AttendanceSchedule(
+        entry=ScheduleWindow(
+            enabled=False,
+            local_time=None,
+            utc_time=None,
+            days=[],
+        ),
+        exit=ScheduleWindow(
+            enabled=False,
+            local_time=None,
+            utc_time=None,
+            days=[],
+        ),
+    )
+    location = LocationData(
+        address="Av. Example 123",
+        latitude=-12.04318,
+        longitude=-77.02824,
+        radius_meters=150,
+    )
+
+    request = AttendanceRequest(
+        is_active=True,
+        schedule=schedule,
+        location=location,
+        random_window_minutes=0,
+        timezone="UTC-05:00 America/Lima",
+    )
+
+    assert request.schedule.entry.local_time is None
+    assert request.schedule.exit.utc_time is None
+
+
+def test_request_requires_times_when_window_enabled():
+    with pytest.raises(PydanticValidationError):
+        AttendanceSchedule(
+            entry=ScheduleWindow(
+                enabled=True,
+                local_time=None,
+                utc_time=None,
+                days=[DayOfWeek.MONDAY],
+            ),
+            exit=ScheduleWindow(
+                enabled=False,
+                local_time=None,
+                utc_time=None,
+                days=[],
+            ),
+        )
+
+
 def test_process_attendance_requires_enabled_window():
     service = make_service()
     request = make_request(entry_enabled=False, exit_enabled=False)
 
-    with pytest.raises(ValidationError):
-        service.process_attendance(request, current_user=FAKE_USER)
+    response = service.process_attendance(request, current_user=FAKE_USER)
+
+    assert response.message == "Attendance schedule saved"
 
 
 def test_process_attendance_propagates_persistence_errors():

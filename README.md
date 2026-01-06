@@ -34,11 +34,15 @@ make docker-run
 Stop the container via `make docker-stop`.
 
 ## API Overview
-| Method | Path                  | Description                        |
-|--------|-----------------------|------------------------------------|
-| POST   | `/api/v1/attendance`  | Records an entry or exit event     |
-| GET    | `/api/v1/health`      | Basic health probe                 |
-| POST   | `/api/v1/auth/token`  | Issues a JWT for testing purposes  |
+| Method | Path                          | Description                               |
+|--------|-------------------------------|-------------------------------------------|
+| PUT    | `/api/v1/attendance`          | Save attendance schedule                  |
+| GET    | `/api/v1/attendance`          | Fetch attendance schedule                 |
+| POST   | `/api/v1/attendance/notify`   | Send WhatsApp notification for an event  |
+| POST   | `/api/v1/attendance/credentials` | Save attendance login credentials     |
+| GET    | `/api/v1/attendance/credentials` | Fetch attendance login metadata       |
+| GET    | `/api/v1/health`              | Basic health probe                        |
+| POST   | `/api/v1/auth/token`          | Issues a JWT for testing purposes         |
 
 ### Token generation
 ```bash
@@ -51,14 +55,77 @@ Use the returned token in the `Authorization: Bearer <token>` header for protect
 
 ### Sample attendance request
 ```bash
-curl -X POST http://localhost:8000/api/v1/attendance \
+curl -X PUT http://localhost:8000/api/v1/attendance \
      -H "Authorization: Bearer <token>" \
      -H "Content-Type: application/json" \
      -d '{
-           "credentials": {"user_id": 1, "password": "secret"},
-           "location": {"latitude": 0.0, "longitude": 0.0},
-           "action": "lnk_entrada"
+           "isActive": true,
+           "randomWindowMinutes": 0,
+           "phoneNumber": "+51976387055",
+           "schedule": {
+             "entry": {
+               "enabled": true,
+               "localTime": "08:00:00",
+               "utcTime": "13:00:00",
+               "days": ["monday", "tuesday"]
+             },
+             "exit": {
+               "enabled": false,
+               "localTime": null,
+               "utcTime": null,
+               "days": []
+             }
+           },
+           "location": {
+             "address": "Avenida",
+             "latitude": -6.758246,
+             "longitude": -79.846117,
+             "radiusMeters": 20
+           },
+           "timezone": "UTC-05:00 America/Lima"
          }'
+```
+
+### Attendance credentials
+Save the per-user login credentials used by the marking workflow. The password is stored in
+Supabase Vault and only the service-role backend can decrypt it.
+
+Endpoint:
+`POST /api/v1/attendance/credentials`
+
+Request body:
+```json
+{
+  "companyId": 7040,
+  "userId": 77668171,
+  "password": "Milagros1234"
+}
+```
+
+Response body:
+```json
+{
+  "success": true,
+  "message": "Attendance credentials saved",
+  "companyId": 7040,
+  "userId": 77668171
+}
+```
+
+Notes:
+- Requires `Authorization: Bearer <token>`.
+- One credential set per user; repeated calls overwrite the stored password.
+
+Fetch saved credentials (password is never returned):
+`GET /api/v1/attendance/credentials`
+
+Response body:
+```json
+{
+  "companyId": 7040,
+  "userId": 77668171,
+  "hasPassword": true
+}
 ```
 
 ## Development Workflow

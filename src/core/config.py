@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     whatsapp_auth_refresh_url: str = "http://localhost:3000/api/v1/auth/refresh"
     whatsapp_auth_username: str = "admin"
     whatsapp_auth_password: str = "example"
+    internal_api_key: str = ""
 
     port: int = 8000
 

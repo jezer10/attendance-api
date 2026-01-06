@@ -27,7 +27,9 @@ class AttendanceService:
         self._ensure_user_context(current_user)
 
         active_windows = self._active_windows(request)
-        if len(active_windows) == 1:
+        if not active_windows:
+            message = "Attendance schedule saved"
+        elif len(active_windows) == 1:
             message = f"{active_windows[0].capitalize()} attendance recorded"
         else:
             message = "Entry and exit attendance recorded"
@@ -59,9 +61,6 @@ class AttendanceService:
         if not request.timezone.strip():
             raise ValidationError("Timezone cannot be empty")
 
-        if not any(w.enabled for w in (request.schedule.entry, request.schedule.exit)):
-            raise ValidationError("At least one schedule window must be enabled")
-
     @staticmethod
     def _active_windows(request: AttendanceRequest) -> List[str]:
         windows = []
@@ -69,7 +68,7 @@ class AttendanceService:
             windows.append("entry")
         if request.schedule.exit.enabled:
             windows.append("exit")
-        return windows or ["entry"]
+        return windows
 
     @staticmethod
     def _ensure_user_context(user: Optional[dict]) -> None:
@@ -103,6 +102,17 @@ class AttendanceService:
         if schedule is None:
             raise NotFoundError("Attendance schedule not found")
 
+        return schedule
+
+    def get_attendance_schedule_for_user(self, *, user_id: str) -> AttendanceRequest:
+        if not user_id:
+            raise ValidationError("User id is required")
+        try:
+            schedule = self._get_repository().fetch_schedule(user_id=user_id)
+        except PersistenceError:
+            raise
+        if schedule is None:
+            raise NotFoundError("Attendance schedule not found")
         return schedule
 
     async def notify_attendance_event(

@@ -1,16 +1,15 @@
-import { createClient } from "@supabase/supabase-js";
-import { DateTime } from "luxon";
-
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { DateTime } from "npm:luxon@3.4.4";
 type AttendanceRecord = {
   user_id: string;
   is_active: boolean;
   timezone: string;
   random_window_minutes: number | null;
   entry_enabled: boolean;
-  entry_local_time: string;
+  entry_local_time: string | null;
   entry_days: string[] | null;
   exit_enabled: boolean;
-  exit_local_time: string;
+  exit_local_time: string | null;
   exit_days: string[] | null;
 };
 
@@ -27,8 +26,15 @@ type AttendanceEventInsert = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+const ATTENDANCE_API_URL = Deno.env.get("ATTENDANCE_API_URL");
+const ATTENDANCE_API_KEY = Deno.env.get("ATTENDANCE_API_KEY");
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+if (
+  !SUPABASE_URL ||
+  !SUPABASE_SERVICE_ROLE_KEY ||
+  !ATTENDANCE_API_URL ||
+  !ATTENDANCE_API_KEY
+) {
   throw new Error("Missing Supabase environment variables.");
 }
 
@@ -119,6 +125,10 @@ function scheduleEvent(
   const baseTime = eventType === "entry"
     ? record.entry_local_time
     : record.exit_local_time;
+
+  if (!baseTime) {
+    return null;
+  }
 
   const localDayName = localNow.toFormat("cccc").toLowerCase();
   console.log({ days, baseTime, localDayName });
@@ -248,8 +258,11 @@ Deno.serve(async () => {
   if (inserts.length > 0) {
     const { error: insertError, data } = await supabase
       .from("attendance_events")
-      .upsert(inserts, { onConflict: "user_id,event_date,event_type" })
-      .select("id");
+      .upsert(inserts, {
+        onConflict: "user_id,event_date,event_type",
+        ignoreDuplicates: true,
+      })
+      .select("id,user_id,event_type");
 
     if (insertError) {
       return new Response(
@@ -264,7 +277,43 @@ Deno.serve(async () => {
       );
     }
 
-    inserted = data?.length ?? 0;
+    const insertedRows = (data ?? []) as {
+      user_id: string;
+      event_type: "entry" | "exit";
+    }[];
+    inserted = insertedRows.length;
+
+    if (insertedRows.length > 0) {
+      await Promise.all(
+        insertedRows.map(async (row) => {
+          const response = await fetch(
+            `${ATTENDANCE_API_URL}/api/v1/attendance/mark/internal`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Internal-Key": ATTENDANCE_API_KEY,
+              },
+              body: JSON.stringify({
+                eventType: row.event_type,
+                userId: row.user_id,
+              }),
+            },
+          );
+
+          if (!response.ok) {
+            const body = await response.text();
+            console.error(
+              "Failed to mark attendance",
+              row.user_id,
+              row.event_type,
+              response.status,
+              body,
+            );
+          }
+        }),
+      );
+    }
   }
 
   return new Response(
