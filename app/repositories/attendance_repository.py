@@ -4,9 +4,9 @@ import logging
 from datetime import time as dt_time
 from typing import Any, Dict, Optional
 
-from src.core.config import settings
-from src.exceptions import PersistenceError
-from src.models import (
+from core.config import settings
+from exceptions import PersistenceError
+from models import (
     AttendanceRequest,
     AttendanceSchedule,
     ScheduleWindow,

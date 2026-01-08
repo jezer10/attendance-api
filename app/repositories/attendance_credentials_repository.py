@@ -4,8 +4,8 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from src.core.config import settings
-from src.exceptions import PersistenceError
+from core.config import settings
+from exceptions import PersistenceError
 
 try:
     from postgrest.exceptions import APIError

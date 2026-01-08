@@ -7,7 +7,7 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 
-from src.exceptions import MarkingError
+from exceptions import MarkingError
 
 logger = logging.getLogger(__name__)
 

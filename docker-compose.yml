@@ -2,7 +2,6 @@ services:
   attendance-api:
     build: .
     container_name: attendance-api
-    command: uvicorn main:app --host 0.0.0.0 --port 8000
     environment:
       - APP_JWT_SECRET_KEY=change-me
       - APP_JWT_ALGORITHM=HS256
@@ -10,7 +9,7 @@ services:
       - APP_PORT=8000
       - APP_ENV=production
     ports:
-      - "8000"
+      - "80"
     networks:
       - general_bridge
 

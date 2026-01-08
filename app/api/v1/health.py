@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from src.models import HealthResponse
+from models import HealthResponse
 from datetime import datetime
 
 router = APIRouter()
