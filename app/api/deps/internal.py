@@ -1,6 +1,6 @@
 from fastapi import Header, HTTPException, status
 
-from core.config import settings
+from app.core.config import settings
 
 
 async def require_internal_key(

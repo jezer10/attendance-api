@@ -1,5 +1,5 @@
 from fastapi import Depends
-from services.auth_service import AuthService, security
+from app.services.auth_service import AuthService, security
 
 from fastapi.security import HTTPAuthorizationCredentials
 

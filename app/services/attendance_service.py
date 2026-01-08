@@ -4,10 +4,10 @@ from typing import List, Optional
 
 import pytz
 
-from models import AttendanceRequest, AttendanceResponse
-from exceptions import NotFoundError, PersistenceError, ValidationError
-from services.whatsapp_service import WhatsAppService
-from repositories.attendance_repository import AttendanceRepository
+from app.models import AttendanceRequest, AttendanceResponse
+from app.exceptions import NotFoundError, PersistenceError, ValidationError
+from app.services.whatsapp_service import WhatsAppService
+from app.repositories.attendance_repository import AttendanceRepository
 
 logger = logging.getLogger(__name__)
 

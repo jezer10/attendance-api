@@ -9,7 +9,7 @@ from postgrest.exceptions import APIError
 from supabase import Client, create_client
 from supabase_auth.errors import AuthApiError
 
-from core.config import settings
+from app.core.config import settings
 
 security = HTTPBearer()
 logger = logging.getLogger(__name__)

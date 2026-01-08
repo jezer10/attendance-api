@@ -13,8 +13,8 @@ from supabase import Client, create_client
 from supabase_auth.errors import AuthApiError
 from typing import Annotated
 
-from core.config import settings
-from services.auth_service import AuthService
+from app.core.config import settings
+from app.services.auth_service import AuthService
 
 
 router = APIRouter()

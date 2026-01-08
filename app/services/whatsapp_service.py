@@ -3,8 +3,8 @@ from typing import Any, Dict, Optional
 
 import httpx
 
-from core.config import settings
-from exceptions import NotificationError
+from app.core.config import settings
+from app.exceptions import NotificationError
 
 logger = logging.getLogger(__name__)
 

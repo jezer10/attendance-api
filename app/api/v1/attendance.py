@@ -1,4 +1,4 @@
-from models import (
+from app.models import (
     AttendanceRequest,
     AttendanceResponse,
     AttendanceNotifyRequest,
@@ -11,19 +11,19 @@ from models import (
     AttendanceInternalMarkRequest,
 )
 from fastapi import HTTPException, Depends, status
-from services.attendance_service import AttendanceService
-from services.attendance_credentials_service import AttendanceCredentialsService
-from services.marking_service import MarkingService
+from app.services.attendance_service import AttendanceService
+from app.services.attendance_credentials_service import AttendanceCredentialsService
+from app.services.marking_service import MarkingService
 from fastapi import APIRouter
-from exceptions import (
+from app.exceptions import (
     NotFoundError,
     PersistenceError,
     ValidationError,
     NotificationError,
     MarkingError,
 )
-from api.deps.auth import get_current_user
-from api.deps.internal import require_internal_key
+from app.api.deps.auth import get_current_user
+from app.api.deps.internal import require_internal_key
 
 import logging
 

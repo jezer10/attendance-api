@@ -2,8 +2,8 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api import router as api_router
-from core.config import settings
+from app.api import router as api_router
+from app.core.config import settings
 import uvicorn
 import os
 
@@ -54,4 +54,4 @@ if __name__ == "__main__":
     reload = settings.env == "development"
     host = settings.host  # valor por defecto si no existe
     port = int(os.getenv("PORT", settings.port))  # uvicorn requiere entero
-    uvicorn.run(app, host=host, port=port, reload=reload)
+    uvicorn.run("app.main:app", host=host, port=port, reload=reload)

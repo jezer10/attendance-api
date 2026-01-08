@@ -3,11 +3,9 @@ from __future__ import annotations
 import logging
 from typing import Dict, Tuple
 from urllib.parse import urljoin
-
 import requests
 from bs4 import BeautifulSoup
-
-from exceptions import MarkingError
+from app.exceptions import MarkingError
 
 logger = logging.getLogger(__name__)
 

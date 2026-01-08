@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from exceptions import ValidationError
-from repositories.attendance_credentials_repository import (
+from app.exceptions import ValidationError
+from app.repositories.attendance_credentials_repository import (
     AttendanceCredentialsRepository,
 )
 
