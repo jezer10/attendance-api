@@ -1,9 +1,11 @@
 fastapi[standard]
 pydantic-settings
-PyJWT==2.8.0
+PyJWT
 supabase
 supabase-auth
-pytz==2024.1
-tzdata==2024.1
-requests==2.32.3
-beautifulsoup4==4.12.3
+pytz
+tzdata
+requests
+beautifulsoup4
+pytest
+ruff
