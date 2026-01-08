@@ -9,7 +9,6 @@ from fastapi.security import (
     HTTPBearer,
 )
 from pydantic import BaseModel, EmailStr
-from postgrest.exceptions import APIError
 from supabase import Client, create_client
 from supabase_auth.errors import AuthApiError
 from typing import Annotated
@@ -90,7 +89,8 @@ def get_current_user(token: str = Depends(get_bearer_token)) -> UserOut:
             email=user_info.user.email,
             full_name=profile.get("full_name") if profile else None,
         )
-    except:
+    except Exception as e:
+        print("Error al obtener usuario", e)
         return UserOut(id=user_info.user.id, email=user_info.user.email, full_name=None)
 
 
@@ -120,6 +120,7 @@ def login(credentials: Annotated[HTTPBasicCredentials, Depends(security)]):
         print("Error en el inicio de sesión:", e)
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
     except Exception as e:
+        print("Error interno del servidor:", e)
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 
