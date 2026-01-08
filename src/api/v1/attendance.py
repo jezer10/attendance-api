@@ -204,9 +204,7 @@ async def mark_attendance_event(
         if not credentials or not credentials.get("password"):
             raise ValidationError("Attendance credentials are required")
 
-        schedule = attendance_service.get_attendance_schedule(
-            current_user=current_user
-        )
+        schedule = attendance_service.get_attendance_schedule(current_user=current_user)
         location = schedule.location
         if location is None:
             raise ValidationError("Location data is required to mark attendance")
@@ -250,9 +248,7 @@ async def mark_attendance_event_internal(
 ) -> AttendanceMarkResponse:
     """Execute the attendance marking flow for scheduler calls."""
     try:
-        credentials = credentials_service.get_credentials(
-            user_id=request_body.user_id
-        )
+        credentials = credentials_service.get_credentials(user_id=request_body.user_id)
         if not credentials or not credentials.get("password"):
             raise ValidationError("Attendance credentials are required")
 

@@ -64,9 +64,7 @@ class MarkingService:
         geo_data["__EVENTTARGET"] = "lnk_proceso"
 
         geo_url = urljoin(BASE_URL, geo_action)
-        geo_response = session.request(
-            geo_method, geo_url, data=geo_data, timeout=30
-        )
+        geo_response = session.request(geo_method, geo_url, data=geo_data, timeout=30)
         self._ensure_ok(geo_response, "geo submit")
 
         assist_data, assist_action, assist_method = self._extract_form_data(

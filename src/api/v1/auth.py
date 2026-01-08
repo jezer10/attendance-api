@@ -96,7 +96,6 @@ def get_current_user(token: str = Depends(get_bearer_token)) -> UserOut:
 
 @router.post("/login")
 def login(credentials: Annotated[HTTPBasicCredentials, Depends(security)]):
-
     try:
         login_resp = supabase.auth.sign_in_with_password(
             {"email": credentials.username, "password": credentials.password}

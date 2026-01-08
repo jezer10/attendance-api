@@ -79,9 +79,7 @@ class AttendanceCredentialsRepository:
             logger.exception("Unexpected persistence error for user %s", user_id)
             raise PersistenceError("Unable to persist attendance credentials") from exc
 
-    def fetch_credentials(
-        self, *, user_id: str
-    ) -> Optional[dict]:
+    def fetch_credentials(self, *, user_id: str) -> Optional[dict]:
         record = self._fetch_credentials_row(user_id=user_id)
         if not record:
             return None
@@ -155,9 +153,7 @@ class AttendanceCredentialsRepository:
         try:
             response = self._client.rpc("read_attendance_secret", params).execute()
         except (AuthApiError, APIError) as exc:
-            logger.warning(
-                "Supabase error reading vault secret %s: %s", secret_id, exc
-            )
+            logger.warning("Supabase error reading vault secret %s: %s", secret_id, exc)
             raise PersistenceError("Unable to read attendance credentials") from exc
         except Exception as exc:  # pragma: no cover - defensive
             logger.exception("Unexpected vault read error for secret %s", secret_id)

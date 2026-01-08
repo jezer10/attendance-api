@@ -1,5 +1,5 @@
 # %%
-import requests 
+import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 
@@ -15,20 +15,22 @@ HEADERS = {
     # 'Upgrade-Insecure-Requests': '1'
 }
 
+
 # %%
 def extract_form_data(html):
-    soup = BeautifulSoup(html, 'html.parser')
-    form = soup.find('form')
+    soup = BeautifulSoup(html, "html.parser")
+    form = soup.find("form")
     if not form:
         raise ValueError("No form found in the HTML.")
-    
+
     form_data = {}
-    for input_tag in form.find_all('input'):
-        name = input_tag.get('name')
-        value = input_tag.get('value', '')
+    for input_tag in form.find_all("input"):
+        name = input_tag.get("name")
+        value = input_tag.get("value", "")
         if name:
             form_data[name] = value
-    return form_data, form.get('action', ''), form.get('method', 'GET').upper()
+    return form_data, form.get("action", ""), form.get("method", "GET").upper()
+
 
 # %%
 def get_page_form_data(client, url, method="GET", data=None, log=False):
@@ -37,6 +39,7 @@ def get_page_form_data(client, url, method="GET", data=None, log=False):
         raise Exception(f"Failed to retrieve page: {response.status_code}")
 
     return extract_form_data(response.text)
+
 
 # %%
 session = requests.Session()
@@ -56,7 +59,9 @@ login_data["__EVENTTARGET"] = "lnk_ingreso"
 login_data
 
 # %%
-log_response = session.request(login_method, urljoin(BASE_URL, login_ext_url), data=login_data)
+log_response = session.request(
+    login_method, urljoin(BASE_URL, login_ext_url), data=login_data
+)
 
 # %%
 geo_data, geo_ext_url, geo_method = extract_form_data(log_response.text)
@@ -73,7 +78,9 @@ geo_data["__EVENTTARGET"] = "lnk_proceso"
 geo_data
 
 # %%
-assist_response = session.request(geo_method, urljoin(BASE_URL, geo_ext_url), data=geo_data)
+assist_response = session.request(
+    geo_method, urljoin(BASE_URL, geo_ext_url), data=geo_data
+)
 
 # %%
 assist_data, assist_ext_url, assist_method = extract_form_data(assist_response.text)
@@ -86,11 +93,13 @@ assist_data
 assist_data["__EVENTTARGET"] = "lnk_entrada"
 
 # %%
-last_response = session.request(assist_method, urljoin(BASE_URL, assist_ext_url), data=assist_data)
+last_response = session.request(
+    assist_method, urljoin(BASE_URL, assist_ext_url), data=assist_data
+)
 last_data, last_ext_url, last_method = extract_form_data(last_response.text)
 
 # %%
-print(BeautifulSoup(last_response.text, 'html.parser').prettify())
+print(BeautifulSoup(last_response.text, "html.parser").prettify())
 
 # %%
 # Mark the assist_data for the next step
@@ -98,5 +107,3 @@ print(BeautifulSoup(last_response.text, 'html.parser').prettify())
 
 # %%
 # assist_data["__EVENTTARGET"] = None
-
-

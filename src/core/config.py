@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     base_url: str = "http://localhost:8000"
     company_id: int = 7040
-    request_timeout:int = 30
+    request_timeout: int = 30
     max_retries: int = 3
     latitude: float = 0.0
     longitude: float = 0.0
